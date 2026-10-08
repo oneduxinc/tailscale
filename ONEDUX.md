@@ -36,11 +36,12 @@ the other.
 
 ```sh
 GOOS=linux GOARCH=amd64 CGO_ENABLED=0 \
-  go build -tags onedux,ts_omit_captiveportal -o tailscaled ./cmd/tailscaled
+  go build -tags onedux,ts_omit_captiveportal,ts_omit_clientupdate -o tailscaled ./cmd/tailscaled
 GOOS=linux GOARCH=amd64 CGO_ENABLED=0 \
-  go build -tags onedux,ts_omit_captiveportal -o tailscale  ./cmd/tailscale
+  go build -tags onedux,ts_omit_captiveportal,ts_omit_clientupdate -o tailscale  ./cmd/tailscale
 ```
 
+`ts_omit_clientupdate` removes upstream update checks (our app ships the daemon).
 `ts_omit_captiveportal` removes captive-portal detection, which otherwise probes
 `controlplane.tailscale.com` / `login.tailscale.com` regardless of `--login-server`.
 
@@ -53,6 +54,7 @@ tailscaled --statedir=/var/lib/oneduxsoar --socket=/run/oneduxsoar/tailscaled.so
 
 ## Tests
 
+- CI: `.github/workflows/oneduxsoar-linux.yml` (push to `oneduxsoar` = dev build; manual run with `release=N` = release `v<upstream>-oneduxsoar.N`, tagged). Upstream workflows are disabled in the repository settings.
 - Upstream unit tests: run **without** the `onedux` tag (several linuxfw / osrouter tests
   assert the upstream literals such as `ts-input`, `pref 5210`, `table 52`).
 - Coexistence: install upstream `tailscale` and this build on one Linux host, bring both

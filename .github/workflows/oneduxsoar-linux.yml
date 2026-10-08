@@ -1,0 +1,160 @@
+# OneDux Soar daemon: Linux tailscaled + tailscale (amd64, arm64) as workflow artifacts.
+#
+# Builds the `oneduxsoar` branch with the `onedux` tag (coexistence patch, see ONEDUX.md) plus
+# ts_omit_captiveportal (no probes to controlplane/login.tailscale.com) and ts_omit_clientupdate
+# (no upstream update checks; our desktop app ships and upgrades the daemon). Toolchain and flags
+# follow upstream's build_dist.sh: ./tool/go (the Go toolchain pinned in go.toolchain.rev),
+# CGO_ENABLED=0, -trimpath, version stamped through ldflags.
+#
+# Version: shortStamp stays upstream's (VERSION.txt, used for version comparisons); longStamp is
+# <upstream>-oneduxsoar.<N> for a release run, <upstream>-oneduxsoar.dev-t<sha> otherwise.
+#
+# Upstream workflows are disabled in the repository settings, not deleted, so rebasing onto
+# upstream stays conflict-free.
+name: OneDux Soar Linux
+
+on:
+  workflow_dispatch:
+    inputs:
+      release:
+        description: "Release number N for version <upstream>-oneduxsoar.N; leave empty for a dev build"
+        required: false
+        default: ""
+  push:
+    branches:
+      - oneduxsoar
+    paths-ignore:
+      - "docs/**"
+      - "**.md"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  TAGS: onedux,ts_omit_captiveportal,ts_omit_clientupdate
+  RELEASE: ${{ github.event.inputs.release }}
+
+jobs:
+  prepare:
+    runs-on: ubuntu-24.04
+    outputs:
+      long: ${{ steps.version.outputs.long }}
+      short: ${{ steps.version.outputs.short }}
+      tag: ${{ steps.version.outputs.tag }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      # Release runs fail here, in the first minute, if the number is malformed, the branch is
+      # wrong or the tag already exists.
+      - name: Version
+        id: version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          short="$(tr -d '[:space:]' < VERSION.txt)"
+          if [ -n "$RELEASE" ]; then
+            [[ "$RELEASE" =~ ^[1-9][0-9]*$ ]] || { echo "::error::release must be a positive integer, got '$RELEASE'"; exit 1; }
+            [[ "$GITHUB_REF" == "refs/heads/oneduxsoar" ]] || { echo "::error::releases are made from the oneduxsoar branch, not $GITHUB_REF"; exit 1; }
+            long="${short}-oneduxsoar.${RELEASE}"
+            tag="v${long}"
+            if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$tag" >/dev/null 2>&1; then
+              echo "::error::tag $tag already exists; use the next release number"; exit 1
+            fi
+          else
+            long="${short}-oneduxsoar.dev-t${GITHUB_SHA:0:9}"
+            tag=""
+          fi
+          { echo "short=$short"; echo "long=$long"; echo "tag=$tag"; } >> "$GITHUB_OUTPUT"
+          echo "Building $long from $GITHUB_SHA"
+
+  # Upstream's own tests for the packages the patch touches, run WITHOUT the onedux tag: several of
+  # them assert upstream's literals (ts-input, pref 5210, table 52). The onedux variant is vetted
+  # here and exercised by the coexistence test on a real host (ONEDUX.md).
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - name: Upstream unit tests (patched packages)
+        run: ./tool/go test ./tsconst/... ./util/linuxfw/... ./wgengine/router/... ./net/netmon/...
+      - name: Vet with the onedux tag
+        run: ./tool/go vet -tags "$TAGS" ./tsconst/ ./util/linuxfw/ ./wgengine/router/osrouter/ ./net/netmon/
+
+  build:
+    needs: [prepare, test]
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        goarch: [amd64, arm64]
+    env:
+      LONG: ${{ needs.prepare.outputs.long }}
+      SHORT: ${{ needs.prepare.outputs.short }}
+      GOARCH: ${{ matrix.goarch }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Build
+        env:
+          GOOS: linux
+          CGO_ENABLED: "0"
+        run: |
+          ldflags="-X tailscale.com/version.longStamp=${LONG} -X tailscale.com/version.shortStamp=${SHORT}"
+          mkdir -p dist
+          for cmd in tailscaled tailscale; do
+            ./tool/go build -tags "$TAGS" -trimpath -ldflags "$ldflags" -o "dist/$cmd" "./cmd/$cmd"
+          done
+
+      # Guard against a build that silently lost the patch or the omit tags.
+      - name: Check the binaries
+        run: |
+          ./tool/go version -m dist/tailscaled | grep -E -- "-tags=.*onedux" || { echo "::error::onedux tag missing"; exit 1; }
+          if grep -a -q 'controlplane.tailscale.com/generate_204' dist/tailscaled; then
+            echo "::error::captive portal detection is still compiled in"; exit 1
+          fi
+          grep -a -q 'odx-input' dist/tailscaled || { echo "::error::odx- chain prefix not found"; exit 1; }
+          if [ "$GOARCH" = amd64 ]; then
+            got="$(dist/tailscale version --json | python3 -c 'import sys,json;print(json.load(sys.stdin)["long"])')"
+            [ "$got" = "$LONG" ] || { echo "::error::tailscale version reports long='$got', want '$LONG'"; exit 1; }
+          fi
+
+      - name: Package
+        run: |
+          name="oneduxsoar-daemon-${LONG}-linux-${GOARCH}"
+          mkdir -p "pkg/$name"
+          cp dist/tailscaled dist/tailscale LICENSE ONEDUX.md "pkg/$name/"
+          tar -C pkg -czf "pkg/$name.tar.gz" "$name"
+          (cd pkg && sha256sum "$name.tar.gz" > "$name.tar.gz.sha256" && cat "$name.tar.gz.sha256")
+          echo "PKG_NAME=$name" >> "$GITHUB_ENV"
+
+      - uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: ${{ env.PKG_NAME }}
+          path: |
+            pkg/${{ env.PKG_NAME }}.tar.gz
+            pkg/${{ env.PKG_NAME }}.tar.gz.sha256
+          retention-days: ${{ env.RELEASE != '' && 90 || 14 }}
+          if-no-files-found: error
+
+  # Release runs only: tag the built commit (tag only, no GitHub release). Tags are never deleted,
+  # so a released binary can always be traced back to its source.
+  tag:
+    if: github.event.inputs.release != ''
+    needs: [prepare, build]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Tag the release commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+        run: gh api "repos/$GITHUB_REPOSITORY/git/refs" -f ref="refs/tags/$TAG" -f sha="$GITHUB_SHA" --jq '.ref + " -> " + .object.sha'
