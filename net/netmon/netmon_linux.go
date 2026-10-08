@@ -15,6 +15,7 @@ import (
 	"golang.org/x/sys/unix"
 	"tailscale.com/envknob"
 	"tailscale.com/net/tsaddr"
+	"tailscale.com/tsconst"
 	"tailscale.com/types/logger"
 	"tailscale.com/util/eventbus"
 )
@@ -289,7 +290,7 @@ type newRouteMessage struct {
 	Table    uint8
 }
 
-const tsTable = 52
+const tsTable = tsconst.LinuxRouteTable
 
 func (m *newRouteMessage) ignore() bool {
 	return m.Table == tsTable || tsaddr.IsTailscaleIP(m.Dst.Addr())

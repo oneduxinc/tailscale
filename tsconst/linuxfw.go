@@ -1,6 +1,8 @@
 // Copyright (c) Tailscale Inc & contributors
 // SPDX-License-Identifier: BSD-3-Clause
 
+//go:build !onedux
+
 package tsconst
 
 // Linux firewall constants used by Tailscale.
@@ -40,4 +42,16 @@ const (
 	// routed over the Tailscale network.
 	LinuxBypassMark    = "0x80000"
 	LinuxBypassMarkNum = 0x80000
+)
+
+// Identifiers that two tailscaled processes on the same Linux host must not
+// share: the prefix of the netfilter chains (and nftables rule labels) we own,
+// the policy routing table, and the base priority of our ip rules. Builds with
+// the "onedux" tag use different values (see linuxfw_onedux.go) so that such a
+// build can run next to an upstream tailscaled without either one deleting or
+// rewriting the other's rules.
+const (
+	LinuxChainPrefix    = "ts-"
+	LinuxRouteTable     = 52
+	LinuxIPRulePrefBase = 5200
 )

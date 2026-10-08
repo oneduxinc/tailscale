@@ -138,7 +138,7 @@ func newUserspaceRouterAdvanced(logf logger.Logf, tunname string, netMon *netmon
 		cmd: cmd,
 
 		ipRuleFixLimiter: rate.NewLimiter(rate.Every(5*time.Second), 10),
-		ipPolicyPrefBase: 5200,
+		ipPolicyPrefBase: tsconst.LinuxIPRulePrefBase,
 	}
 	r.interfaceV6Usable = func() bool { return interfaceV6UsableForTun(r.tunname) }
 	ec := bus.Client("router-linux")
@@ -1571,7 +1571,7 @@ var (
 	// stay in the 0-255 range even though linux itself supports
 	// larger numbers. (but nowadays we use netlink directly and
 	// aren't affected by the busybox binary's limitations)
-	tailscaleRouteTable = newRouteTable("tailscale", 52)
+	tailscaleRouteTable = newRouteTable("tailscale", tsconst.LinuxRouteTable)
 )
 
 // baseIPRules are the policy routing rules that Tailscale uses, when not
