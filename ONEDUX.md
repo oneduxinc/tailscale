@@ -3,7 +3,8 @@
 This branch (`oneduxsoar`) is upstream `tailscale/tailscale` plus a small patch so that
 the OneDux Soar daemon can be installed next to an upstream Tailscale client on the same
 Linux host. Our desktop app (separate repository) talks to this `tailscaled` over
-LocalAPI; nothing here changes the UI, protocol or control-plane behaviour.
+LocalAPI; nothing here changes the UI, protocol or control-plane behaviour. The one
+local-authorization addition is described under "Who may operate the daemon".
 
 Without the `onedux` build tag this tree builds exactly upstream's `tailscaled`.
 
@@ -25,6 +26,17 @@ The values live in `tsconst/linuxfw.go` (upstream, `!onedux`) and
 
 The mark byte has to differ as well: the connmark save/restore rules sit in the shared
 `mangle` chains and are found again by content, mask included.
+
+### Who may operate the daemon
+
+Upstream lets root and one `Prefs.OperatorUser` change the node's state over LocalAPI.
+That pref is stored in the current login profile: it is lost on logout and on a restart
+while logged out, after which a desktop user cannot log back in from the GUI.
+
+The `onedux` build additionally accepts members of the local group **`onedux-soar`**
+(`ipn/ipnauth/operatorgroup_onedux.go`; checked per connection in
+`ConnIdentity.IsReadonlyConn`). Without the tag the group name is empty and the check is
+a no-op. `OperatorUser` keeps working as upstream.
 
 Still shared, by design: while **both** daemons are Running, each one's
 "drop CGNAT-sourced traffic not arriving on my interface" rule drops tailnet traffic on

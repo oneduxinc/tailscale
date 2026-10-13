@@ -196,6 +196,10 @@ func (ci *ConnIdentity) IsReadonlyConn(operatorUID string, logf logger.Logf) boo
 		logf("connection from userid %v; is configured operator", uid)
 		return rw
 	}
+	if isOperatorGroupMember(uid) {
+		logf("connection from userid %v; is member of operator group %q", uid, operatorGroup)
+		return rw
+	}
 	if yes, err := isLocalAdmin(uid); err != nil {
 		logf("connection from userid %v; read-only; %v", uid, err)
 		return ro
@@ -205,6 +209,20 @@ func (ci *ConnIdentity) IsReadonlyConn(operatorUID string, logf logger.Logf) boo
 	}
 	logf("connection from userid %v; read-only", uid)
 	return ro
+}
+
+// isOperatorGroupMember reports whether uid belongs to operatorGroup.
+// It is always false when the build has no operator group (upstream).
+func isOperatorGroupMember(uid string) bool {
+	if operatorGroup == "" {
+		return false
+	}
+	u, err := user.LookupId(uid)
+	if err != nil {
+		return false
+	}
+	yes, err := groupmember.IsMemberOfGroup(operatorGroup, u.Username)
+	return err == nil && yes
 }
 
 func isLocalAdmin(uid string) (bool, error) {
