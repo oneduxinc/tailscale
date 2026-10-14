@@ -22,11 +22,13 @@ import (
 	"golang.org/x/exp/constraints"
 	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/registry"
+
+	"tailscale.com/tsconst"
 )
 
 const (
-	regBase       = `SOFTWARE\Tailscale IPN`
-	regPolicyBase = `SOFTWARE\Policies\Tailscale`
+	regBase       = tsconst.WindowsRegBase
+	regPolicyBase = tsconst.WindowsRegPolicyBase
 )
 
 // ErrNoShell is returned when the shell process is not found.

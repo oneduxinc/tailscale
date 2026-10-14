@@ -75,7 +75,7 @@ func defaultTunName() string {
 	case "openbsd":
 		return "tun"
 	case "windows":
-		return "Tailscale"
+		return tsconst.WindowsTunName
 	case "darwin":
 		// "utun" is recognized by wireguard-go/tun/tun_darwin.go
 		// as a magic value that uses/creates any free number.
@@ -116,7 +116,7 @@ func defaultPort() uint16 {
 		}
 	}
 	if envknob.GOOS() == "windows" {
-		return 41641
+		return tsconst.WindowsDefaultPort
 	}
 	return 0
 }

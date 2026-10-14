@@ -49,6 +49,7 @@ import (
 	"tailscale.com/net/dns"
 	"tailscale.com/net/netmon"
 	"tailscale.com/net/tstun"
+	"tailscale.com/tsconst"
 	wintunconst "tailscale.com/tsconst/wintun"
 	"tailscale.com/tsd"
 	"tailscale.com/types/logger"
@@ -90,7 +91,7 @@ func init() {
 	}
 }
 
-const serviceName = "Tailscale"
+const serviceName = tsconst.WindowsServiceName
 
 // Application-defined command codes between 128 and 255
 // See https://web.archive.org/web/20221007222822/https://learn.microsoft.com/en-us/windows/win32/api/winsvc/nf-winsvc-controlservice

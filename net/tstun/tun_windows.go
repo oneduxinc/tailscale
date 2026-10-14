@@ -7,11 +7,13 @@ import (
 	"github.com/tailscale/wireguard-go/tun"
 	"golang.org/x/sys/windows"
 	"golang.zx2c4.com/wireguard/windows/tunnel/winipcfg"
+
+	"tailscale.com/tsconst"
 )
 
 func init() {
-	tun.WintunTunnelType = "Tailscale"
-	guid, err := windows.GUIDFromString("{37217669-42da-4657-a55b-0d995d328250}")
+	tun.WintunTunnelType = tsconst.WindowsTunName
+	guid, err := windows.GUIDFromString(tsconst.WindowsTunGUID)
 	if err != nil {
 		panic(err)
 	}

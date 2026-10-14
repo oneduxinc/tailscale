@@ -13,6 +13,7 @@ import (
 
 	"tailscale.com/atomicfile"
 	"tailscale.com/ipn"
+	"tailscale.com/tsconst"
 	"tailscale.com/util/winutil/policy"
 )
 
@@ -35,7 +36,7 @@ func legacyPrefsDir(uid ipn.WindowsUserID) (string, error) {
 	if usr.HomeDir == "" {
 		return "", fmt.Errorf("user %q does not have a home directory", uid)
 	}
-	userLegacyPrefsDir := filepath.Join(usr.HomeDir, "AppData", "Local", "Tailscale")
+	userLegacyPrefsDir := filepath.Join(usr.HomeDir, "AppData", "Local", tsconst.WindowsDirName)
 	return userLegacyPrefsDir, nil
 }
 

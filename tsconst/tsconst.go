@@ -5,9 +5,9 @@
 // codebase.
 package tsconst
 
-// WintunInterfaceDesc is the description attached to Tailscale
-// interfaces on Windows. This is set by the WinTun driver.
-const WintunInterfaceDesc = "Tailscale Tunnel"
+// WintunInterfaceDesc0_14 is the description Wintun 0.14 attached to
+// interfaces on Windows. WintunInterfaceDesc, the current one, is in
+// windows.go with the other identifiers tailscaled claims on a Windows host.
 const WintunInterfaceDesc0_14 = "Wintun Userspace Tunnel"
 
 // TailnetLockNotTrustedMsg is the error message used by tailnet lock

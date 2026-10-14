@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"tailscale.com/syncs"
+	"tailscale.com/tsconst"
 	"tailscale.com/version/distro"
 )
 
@@ -54,7 +55,7 @@ func WindowsDevTailscaledSocket() string {
 // or the empty string if there's no reasonable default.
 func DefaultTailscaledSocket() string {
 	if runtime.GOOS == "windows" {
-		return WindowsProtectedPipePrefix + `Tailscale\tailscaled`
+		return WindowsProtectedPipePrefix + tsconst.WindowsPipeDir + `\tailscaled`
 	}
 	if runtime.GOOS == "darwin" {
 		return "/var/run/tailscaled.socket"
@@ -105,7 +106,7 @@ func DefaultTailscaledStateFile() string {
 		return f()
 	}
 	if runtime.GOOS == "windows" {
-		return filepath.Join(os.Getenv("ProgramData"), "Tailscale", "server-state.conf")
+		return filepath.Join(os.Getenv("ProgramData"), tsconst.WindowsDirName, "server-state.conf")
 	}
 	return ""
 }
@@ -157,7 +158,7 @@ func MkStateDir(dirPath string) error {
 // It is only called on Windows.
 func LegacyStateFilePath() string {
 	if runtime.GOOS == "windows" {
-		return filepath.Join(os.Getenv("LocalAppData"), "Tailscale", "server-state.conf")
+		return filepath.Join(os.Getenv("LocalAppData"), tsconst.WindowsDirName, "server-state.conf")
 	}
 	return ""
 }

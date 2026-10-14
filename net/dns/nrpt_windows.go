@@ -10,6 +10,7 @@ import (
 
 	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/registry"
+	"tailscale.com/tsconst"
 	"tailscale.com/types/logger"
 	"tailscale.com/util/dnsname"
 	"tailscale.com/util/set"
@@ -29,7 +30,7 @@ const (
 	// This is the legacy rule ID that previous versions used when we supported
 	// only a single rule. Now that we support multiple rules are required, we
 	// generate their GUIDs and store them under the Tailscale registry key.
-	nrptSingleRuleID = `{5abe529b-675b-4486-8459-25a634dacc23}`
+	nrptSingleRuleID = tsconst.WindowsNRPTRuleID
 
 	// This is the name of the registry value we use to save Rule IDs under
 	// the Tailscale registry key.

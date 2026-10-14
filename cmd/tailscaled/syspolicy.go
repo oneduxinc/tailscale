@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"runtime"
 
+	"tailscale.com/tsconst"
 	"tailscale.com/util/syspolicy"
 )
 
@@ -33,7 +34,7 @@ var syspolicyFile string
 func defaultSyspolicyFile() string {
 	if runtime.GOOS == "windows" {
 		if pd := os.Getenv("ProgramData"); pd != "" {
-			return filepath.Join(pd, "Tailscale", "syspolicy.json")
+			return filepath.Join(pd, tsconst.WindowsDirName, "syspolicy.json")
 		}
 		return ""
 	}

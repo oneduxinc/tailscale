@@ -24,10 +24,19 @@ import (
 	"golang.zx2c4.com/wireguard/windows/tunnel/winipcfg"
 	"tailscale.com/health"
 	"tailscale.com/net/netmon"
+	"tailscale.com/tsconst"
 	"tailscale.com/types/logger"
 	"tailscale.com/util/backoff"
 	"tailscale.com/util/eventbus"
 	"tailscale.com/wgengine/router"
+)
+
+// Names of the Windows Firewall rules this tailscaled manages. They are
+// deleted by name, so a build that is meant to coexist with another tailscaled
+// needs names of its own (tsconst.WindowsFirewallRulePrefix).
+const (
+	fwRuleIn      = tsconst.WindowsFirewallRulePrefix + "-In"
+	fwRuleProcess = tsconst.WindowsFirewallRulePrefix + "-Process"
 )
 
 func init() {
@@ -288,12 +297,12 @@ func (ft *firewallTweaker) doSet(local []string, killswitch bool, clear bool, pr
 		// TODO(bradfitz): care? That'd involve querying it before/after to see
 		// whether it was necessary/worked. But the output format is localized,
 		// so can't rely on parsing English. Maybe need to use OLE, not netsh.exe?
-		d, _ := ft.runFirewall("delete", "rule", "name=Tailscale-In", "dir=in")
+		d, _ := ft.runFirewall("delete", "rule", "name="+fwRuleIn, "dir=in")
 		ft.logf("cleared Tailscale-In firewall rules in %v", d)
 	}
 	if procRule {
 		ft.logf("deleting any prior Tailscale-Process rule...")
-		d, err := ft.runFirewall("delete", "rule", "name=Tailscale-Process", "dir=in") // best effort
+		d, err := ft.runFirewall("delete", "rule", "name="+fwRuleProcess, "dir=in") // best effort
 		if err == nil {
 			ft.logf("removed old Tailscale-Process rule in %v", d)
 		}
@@ -303,7 +312,7 @@ func (ft *firewallTweaker) doSet(local []string, killswitch bool, clear bool, pr
 			ft.logf("failed to find Executable for Tailscale-Process rule: %v", err)
 		} else {
 			ft.logf("adding Tailscale-Process rule to allow UDP for %q ...", exe)
-			d, err = ft.runFirewall("add", "rule", "name=Tailscale-Process",
+			d, err = ft.runFirewall("add", "rule", "name="+fwRuleProcess,
 				"dir=in",
 				"action=allow",
 				"edge=yes",
@@ -325,7 +334,7 @@ func (ft *firewallTweaker) doSet(local []string, killswitch bool, clear bool, pr
 	for _, cidr := range local {
 		ft.logf("adding Tailscale-In rule to allow %v ...", cidr)
 		var d time.Duration
-		d, err := ft.runFirewall("add", "rule", "name=Tailscale-In", "dir=in", "action=allow", "localip="+cidr, "profile=private,domain", "enable=yes")
+		d, err := ft.runFirewall("add", "rule", "name="+fwRuleIn, "dir=in", "action=allow", "localip="+cidr, "profile=private,domain", "enable=yes")
 		if err != nil {
 			ft.logf("error adding Tailscale-In rule to allow %v: %v", cidr, err)
 			return err

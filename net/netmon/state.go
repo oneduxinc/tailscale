@@ -20,6 +20,7 @@ import (
 	"tailscale.com/hostinfo"
 	"tailscale.com/net/netaddr"
 	"tailscale.com/net/tsaddr"
+	"tailscale.com/tsconst"
 	"tailscale.com/util/mak"
 )
 
@@ -576,7 +577,7 @@ func isTailscaleInterface(name string, ips []netip.Prefix) bool {
 	}
 
 	// Windows, Linux...
-	return name == "Tailscale" || // as it is on Windows
+	return name == tsconst.WindowsTunName || // as it is on Windows
 		strings.HasPrefix(name, "tailscale") // TODO: use --tun flag value, etc; see TODO in method doc
 }
 

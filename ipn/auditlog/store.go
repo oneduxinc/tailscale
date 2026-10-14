@@ -10,6 +10,7 @@ import (
 	"runtime"
 
 	"tailscale.com/ipn/store"
+	"tailscale.com/tsconst"
 	"tailscale.com/types/lazy"
 	"tailscale.com/types/logger"
 	"tailscale.com/util/must"
@@ -32,7 +33,7 @@ func SetStoreFilePath(path string) {
 func DefaultStoreFilePath() (string, error) {
 	switch runtime.GOOS {
 	case "windows":
-		return filepath.Join(os.Getenv("ProgramData"), "Tailscale", "audit-log.json"), nil
+		return filepath.Join(os.Getenv("ProgramData"), tsconst.WindowsDirName, "audit-log.json"), nil
 	default:
 		// The auditlog package must either be omitted from the build,
 		// have the platform-specific store path set with [SetStoreFilePath] (e.g., on macOS),

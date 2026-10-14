@@ -34,6 +34,7 @@ import (
 	"tailscale.com/feature/buildfeatures"
 	"tailscale.com/kube/kubetypes"
 	"tailscale.com/syncs"
+	"tailscale.com/tsconst"
 	"tailscale.com/types/opt"
 	"tailscale.com/util/testenv"
 	"tailscale.com/version"
@@ -480,7 +481,7 @@ var crashOnUnexpected = RegisterOptBool("TS_DEBUG_CRASH_ON_UNEXPECTED")
 // NoLogsNoSupport reports whether the client's opted out of log uploads and
 // technical support.
 func NoLogsNoSupport() bool {
-	return Bool("TS_NO_LOGS_NO_SUPPORT")
+	return tsconst.NoLogsNoSupportByDefault || Bool("TS_NO_LOGS_NO_SUPPORT")
 }
 
 var allowRemoteUpdate = RegisterBool("TS_ALLOW_ADMIN_CONSOLE_REMOTE_UPDATE")
@@ -628,7 +629,7 @@ func getPlatformEnvFiles() []string {
 	switch runtime.GOOS {
 	case "windows":
 		return []string{
-			filepath.Join(os.Getenv("ProgramData"), "Tailscale", "tailscaled-env.txt"),
+			filepath.Join(os.Getenv("ProgramData"), tsconst.WindowsDirName, "tailscaled-env.txt"),
 		}
 	case "linux":
 		if buildfeatures.HasSynology && distro.Get() == distro.Synology {

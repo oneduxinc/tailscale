@@ -83,20 +83,33 @@ jobs:
         with:
           persist-credentials: false
       - name: Upstream unit tests (patched packages)
-        run: ./tool/go test ./tsconst/... ./util/linuxfw/... ./wgengine/router/... ./net/netmon/... ./ipn/ipnauth/...
+        run: ./tool/go test ./tsconst/... ./util/linuxfw/... ./wgengine/router/... ./net/netmon/... ./ipn/ipnauth/... ./envknob/... ./logpolicy/... ./paths/... ./ipn/auditlog/...
       - name: Vet with the onedux tag
-        run: ./tool/go vet -tags "$TAGS" ./tsconst/ ./util/linuxfw/ ./wgengine/router/osrouter/ ./net/netmon/ ./ipn/ipnauth/
+        run: ./tool/go vet -tags "$TAGS" ./tsconst/ ./util/linuxfw/ ./wgengine/router/osrouter/ ./net/netmon/ ./ipn/ipnauth/ ./envknob/
+      # The Windows side of the patch is plain constant substitution; make sure both variants compile.
+      - name: Windows builds with and without the onedux tag
+        env:
+          GOOS: windows
+          GOARCH: amd64
+        run: |
+          ./tool/go build -o /dev/null ./cmd/tailscaled ./cmd/tailscale
+          ./tool/go build -tags "$TAGS" -o /dev/null ./cmd/tailscaled ./cmd/tailscale
 
   build:
     needs: [prepare, test]
     runs-on: ubuntu-24.04
     strategy:
       matrix:
-        goarch: [amd64, arm64]
+        include:
+          - { goos: linux, goarch: amd64 }
+          - { goos: linux, goarch: arm64 }
+          - { goos: windows, goarch: amd64 }
     env:
       LONG: ${{ needs.prepare.outputs.long }}
       SHORT: ${{ needs.prepare.outputs.short }}
+      GOOS: ${{ matrix.goos }}
       GOARCH: ${{ matrix.goarch }}
+      EXE: ${{ matrix.goos == 'windows' && '.exe' || '' }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -104,33 +117,40 @@ jobs:
 
       - name: Build
         env:
-          GOOS: linux
           CGO_ENABLED: "0"
         run: |
           ldflags="-X tailscale.com/version.longStamp=${LONG} -X tailscale.com/version.shortStamp=${SHORT}"
           mkdir -p dist
           for cmd in tailscaled tailscale; do
-            ./tool/go build -tags "$TAGS" -trimpath -ldflags "$ldflags" -o "dist/$cmd" "./cmd/$cmd"
+            ./tool/go build -tags "$TAGS" -trimpath -ldflags "$ldflags" -o "dist/$cmd$EXE" "./cmd/$cmd"
           done
 
       # Guard against a build that silently lost the patch or the omit tags.
       - name: Check the binaries
         run: |
-          ./tool/go version -m dist/tailscaled | grep -E -- "-tags=.*onedux" || { echo "::error::onedux tag missing"; exit 1; }
-          if grep -a -q 'controlplane.tailscale.com/generate_204' dist/tailscaled; then
+          # The build host is linux/amd64 whatever the target; inspect the binaries with the host toolchain.
+          GOOS= GOARCH= ./tool/go version -m "dist/tailscaled$EXE" | grep -E -- "-tags=.*onedux" || { echo "::error::onedux tag missing"; exit 1; }
+          if grep -a -q 'controlplane.tailscale.com/generate_204' "dist/tailscaled$EXE"; then
             echo "::error::captive portal detection is still compiled in"; exit 1
           fi
-          grep -a -q 'odx-input' dist/tailscaled || { echo "::error::odx- chain prefix not found"; exit 1; }
-          if [ "$GOARCH" = amd64 ]; then
+          if [ "$GOOS" = linux ]; then
+            grep -a -q 'odx-input' dist/tailscaled || { echo "::error::odx- chain prefix not found"; exit 1; }
+          else
+            grep -a -q 'OneDux Soar IPN' dist/tailscaled.exe || { echo "::error::Windows identifiers are not the onedux ones"; exit 1; }
+            if grep -a -q 'SOFTWARE\\Tailscale IPN' dist/tailscaled.exe; then
+              echo "::error::upstream registry base is still compiled in"; exit 1
+            fi
+          fi
+          if [ "$GOOS/$GOARCH" = linux/amd64 ]; then
             got="$(dist/tailscale version --json | python3 -c 'import sys,json;print(json.load(sys.stdin)["long"])')"
             [ "$got" = "$LONG" ] || { echo "::error::tailscale version reports long='$got', want '$LONG'"; exit 1; }
           fi
 
       - name: Package
         run: |
-          name="oneduxsoar-daemon-${LONG}-linux-${GOARCH}"
+          name="oneduxsoar-daemon-${LONG}-${GOOS}-${GOARCH}"
           mkdir -p "pkg/$name"
-          cp dist/tailscaled dist/tailscale LICENSE ONEDUX.md "pkg/$name/"
+          cp "dist/tailscaled$EXE" "dist/tailscale$EXE" LICENSE ONEDUX.md "pkg/$name/"
           tar -C pkg -czf "pkg/$name.tar.gz" "$name"
           (cd pkg && sha256sum "$name.tar.gz" > "$name.tar.gz.sha256" && cat "$name.tar.gz.sha256")
           echo "PKG_NAME=$name" >> "$GITHUB_ENV"

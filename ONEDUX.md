@@ -27,6 +27,40 @@ The values live in `tsconst/linuxfw.go` (upstream, `!onedux`) and
 The mark byte has to differ as well: the connmark save/restore rules sit in the shared
 `mangle` chains and are found again by content, mask included.
 
+### Windows
+
+On Windows the identifiers are different but the problem is the same, with one twist: when
+`tailscaled.exe` runs as a service it ignores `--socket`, `--statedir`, `--tun` and `--port`
+(the engine runs in a `/subproc` child that does not get them), so they have to be right by
+default. `tsconst/windows.go` (upstream) and `tsconst/windows_onedux.go` (`onedux`) hold them:
+
+| Identifier | Upstream | `onedux` build |
+|---|---|---|
+| service name / event log source | `Tailscale` | `OneDuxSoar` |
+| LocalAPI pipe | `\\.\pipe\ProtectedPrefix\Administrators\Tailscale\tailscaled` | `…\Administrators\OneDuxSoar\tailscaled` |
+| `%ProgramData%` / `%LocalAppData%` directory (state, logs, audit log, `syspolicy.json`, `tailscaled-env.txt`) | `Tailscale` | `OneDux Soar` |
+| Wintun adapter name / type / description | `Tailscale` / `Tailscale Tunnel` | `OneDux Soar` / `OneDux Soar Tunnel` |
+| Wintun adapter GUID | `{37217669-…}` | `{4ba78abe-…}` |
+| default UDP port | 41641 | 41642 |
+| registry (settings / policy) | `SOFTWARE\Tailscale IPN`, `SOFTWARE\Policies\Tailscale` | `SOFTWARE\OneDux Soar IPN`, `SOFTWARE\Policies\OneDux Soar` |
+| legacy NRPT rule ID | `{5abe529b-…}` | `{17c94c2b-…}` |
+| Windows Firewall rules, WFP display names | `Tailscale-In`, `Tailscale-Process`, `Tailscale …` | `OneDuxSoar-In`, `OneDuxSoar-Process`, `OneDuxSoar …` |
+
+With these, `tailscaled.exe install-system-daemon` installs a second, independent service.
+Tested on Windows 11 next to the official 1.104.1 client: both logged in, each restarted,
+stopped, used as the one with an exit node, and ours uninstalled, without the other's
+adapter, addresses, firewall rules, NRPT rule or state changing.
+
+Not removed by `uninstall-system-daemon` (an installer has to): the `OneDuxSoar-Process`
+firewall rule, the `SOFTWARE\OneDux Soar IPN` key, `%ProgramData%\OneDux Soar`.
+
+### No log upload by default
+
+The `onedux` build never uploads logs to log.tailscale.com (`tsconst.NoLogsNoSupportByDefault`,
+read by `envknob.NoLogsNoSupport`). Upstream needs `--no-logs-no-support` for that, which the
+Windows service cannot be given and which every other invocation (`tailscaled --cleanup`)
+would have to repeat.
+
 ### Who may operate the daemon
 
 Upstream lets root and one `Prefs.OperatorUser` change the node's state over LocalAPI.
@@ -66,7 +100,7 @@ tailscaled --statedir=/var/lib/oneduxsoar --socket=/run/oneduxsoar/tailscaled.so
 
 ## Tests
 
-- CI: `.github/workflows/oneduxsoar-linux.yml` (push to `oneduxsoar` = dev build; manual run with `release=N` = release `v<upstream>-oneduxsoar.N`, tagged). Upstream workflows are disabled in the repository settings.
+- CI: `.github/workflows/oneduxsoar-linux.yml` (despite the name it also builds windows/amd64; push to `oneduxsoar` = dev build; manual run with `release=N` = release `v<upstream>-oneduxsoar.N`, tagged). Upstream workflows are disabled in the repository settings.
 - Upstream unit tests: run **without** the `onedux` tag (several linuxfw / osrouter tests
   assert the upstream literals such as `ts-input`, `pref 5210`, `table 52`).
 - Coexistence: install upstream `tailscale` and this build on one Linux host, bring both

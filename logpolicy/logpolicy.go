@@ -48,6 +48,7 @@ import (
 	"tailscale.com/net/tlsdial"
 	"tailscale.com/paths"
 	"tailscale.com/safesocket"
+	"tailscale.com/tsconst"
 	"tailscale.com/types/logger"
 	"tailscale.com/types/logid"
 	"tailscale.com/util/clientmetric"
@@ -225,13 +226,13 @@ func LogsDir(logf logger.Logf) string {
 			// as a regular user (perhaps in userspace-networking/SOCK5 mode) and we should
 			// just use the %LocalAppData% instead. In a user context, %LocalAppData% isn't
 			// subject to random deletions from Windows system updates.
-			dir := filepath.Join(os.Getenv("ProgramData"), "Tailscale")
+			dir := filepath.Join(os.Getenv("ProgramData"), tsconst.WindowsDirName)
 			if winProgramDataAccessible(dir) {
 				logf("logpolicy: using dir %v", dir)
 				return dir
 			}
 		}
-		dir := filepath.Join(os.Getenv("LocalAppData"), "Tailscale")
+		dir := filepath.Join(os.Getenv("LocalAppData"), tsconst.WindowsDirName)
 		logf("logpolicy: using LocalAppData dir %v", dir)
 		return dir
 	case "linux":
@@ -597,7 +598,7 @@ func (opts Options) init(disableLogging bool) (*logtail.Config, *Policy) {
 			// %LocalAppData%\tailscaled.log.conf
 			//
 			// Attempt to migrate the log conf to C:\ProgramData\Tailscale
-			oldDir := filepath.Join(os.Getenv("LocalAppData"), "Tailscale")
+			oldDir := filepath.Join(os.Getenv("LocalAppData"), tsconst.WindowsDirName)
 
 			oldPath := filepath.Join(oldDir, "tailscaled.log.conf")
 			if fi, err := os.Stat(oldPath); err != nil || !fi.Mode().IsRegular() {
